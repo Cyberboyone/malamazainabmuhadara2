@@ -77,5 +77,8 @@ app.*.map.json
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
+# Local keystore files (use GitHub Actions secrets instead)
+KEYSTORE_BASE64.txt
+
 # Source media - never commit raw audio
 source_media/
