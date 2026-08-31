@@ -1,0 +1,16 @@
+# Release signing configuration — copy to android/key.properties and fill in
+# your own values. android/key.properties is git-ignored: never commit it or
+# the keystore itself.
+#
+# Generate both with:  bash tools/create_release_keystore.sh
+#
+# storeFile is resolved relative to android/app/, so a keystore placed at
+# android/app/upload-keystore.jks is simply "upload-keystore.jks".
+
+storeFile=upload-keystore.jks
+storePassword=REPLACE_WITH_YOUR_STORE_PASSWORD
+keyAlias=upload
+keyPassword=REPLACE_WITH_YOUR_KEY_PASSWORD
+
+# Optional — auto-detected when omitted (jks for .jks, pkcs12 for .p12/.pfx).
+# storeType=pkcs12
