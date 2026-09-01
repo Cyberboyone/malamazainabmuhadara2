@@ -5,7 +5,9 @@ import '../data/sample_lessons.dart';
 import '../models/lesson.dart';
 import '../services/player_service.dart';
 import '../services/progress_service.dart';
-import '../theme/neumorphic.dart';
+import '../theme/app_theme.dart';
+import '../widgets/audio_progress_bar.dart';
+import '../widgets/gold_icon_button.dart';
 
 class PlayerScreen extends StatefulWidget {
   final Lesson lesson;
@@ -18,7 +20,6 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   final _audio = PlayerService.instance;
   AudioPlayer get _player => _audio.player;
-  final _progressKey = GlobalKey();
   late List<Lesson> _courseLessons;
   late int _currentIndex;
   StreamSubscription<PlayerState>? _completionSub;
@@ -77,14 +78,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  void _seekFromPosition(Offset globalPosition, double barWidth, int totalMs) {
-    final box = _progressKey.currentContext!
-        .findRenderObject() as RenderBox;
-    final localX = box.globalToLocal(globalPosition).dx;
-    final ratio = (localX / barWidth).clamp(0.0, 1.0);
-    _player.seek(Duration(milliseconds: (totalMs * ratio).toInt()));
-  }
-
   void _saveCurrentPosition() {
     if (_player.position > Duration.zero) {
       ProgressService.instance.savePosition(
@@ -101,54 +94,53 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.dispose();
   }
 
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    final s = d.inSeconds.remainder(60);
-    if (h > 0) {
-      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-    }
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final lesson = widget.lesson;
+    final lesson = _courseLessons[_currentIndex];
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 700;
-            final artworkSize =
-                (constraints.maxHeight * 0.28).clamp(150.0, 220.0);
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-              child: ConstrainedBox(
-                constraints:
-                    BoxConstraints(minHeight: constraints.maxHeight - 32),
-                child: IntrinsicHeight(
+      body: PremiumBackground(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 700;
+              final artworkSize =
+                  (constraints.maxWidth * 0.5).clamp(170.0, 260.0);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 24),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Top bar
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          NeumorphicCircleButton(
-                            icon: Icons.arrow_back,
+                          GoldIconButton(
+                            icon: Icons.keyboard_arrow_down_rounded,
                             size: 44,
-                            iconSize: 22,
+                            iconSize: 26,
                             onTap: () => Navigator.of(context).maybePop(),
                           ),
-                          Text(
-                            'Playing from Album',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Column(
+                            children: [
+                              const Text(
+                                'Now Playing',
+                                style: AppType.brandTagline,
+                              ),
+                              Text(
+                                lesson.course,
+                                style: AppType.smallMuted,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                          NeumorphicCircleButton(
+                          GoldIconButton(
                             icon: Icons.more_horiz,
                             size: 44,
                             iconSize: 22,
@@ -157,331 +149,360 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ],
                       ),
 
-                      SizedBox(height: compact ? 24 : 40),
+                      SizedBox(height: compact ? 18 : 24),
 
-                      // Circular artwork
-                      Neumorphic(
-                        width: artworkSize,
-                        height: artworkSize,
-                        borderRadius: artworkSize / 2,
-                        style: NeuStyle.raised,
-                        intensity: 1.3,
-                        child: Center(
-                          child: lesson.arabicLabel != null
-                              ? Text(
-                                  lesson.arabicLabel!,
-                                  style: TextStyle(
-                                    fontSize: artworkSize * 0.25,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.accent,
-                                  ),
-                                )
-                              : Icon(Icons.menu_book_outlined,
-                                  size: artworkSize * 0.33,
-                                  color: AppColors.accent),
-                        ),
+                      // Central artwork
+                      _ArtworkDisc(
+                        size: artworkSize,
+                        lesson: lesson,
+                        playing: _audio.isPlaying,
                       ),
 
-                      SizedBox(height: compact ? 20 : 32),
+                      SizedBox(height: compact ? 18 : 28),
 
-              // Scholar photo + Title + Course + Subtitle
-              Column(
-                children: [
-                  if (lesson.scholarPhotoPath != null)
-                    ClipOval(
-                      child: Image.asset(
-                        lesson.scholarPhotoPath!,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-color: AppColors.accent.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.person,
-                                color: AppColors.accent, size: 32),
-                          );
-                        },
+                      // Title
+                      Text(
+                        lesson.title,
+                        textAlign: TextAlign.center,
+                        style: AppType.screenTitle,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  const SizedBox(height: 12),
-                  Text(
-                    lesson.title,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  if (lesson.course.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        lesson.course,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Shaikh: ${lesson.scholarName}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-
-              const Spacer(),
-
-              // Progress bar with draggable thumb
-              StreamBuilder<Duration?>(
-                stream: _player.durationStream,
-                builder: (context, snapshot) {
-                  final duration = snapshot.data ?? widget.lesson.duration;
-                  return StreamBuilder<Duration>(
-                    stream: _player.positionStream,
-                    builder: (context, posSnapshot) {
-                      final position = posSnapshot.data ?? Duration.zero;
-                      final totalMs = duration
-                          .inMilliseconds
-                          .clamp(1, double.infinity)
-                          .toInt();
-                      final fraction = (position.inMilliseconds / totalMs)
-                          .clamp(0.0, 1.0);
-
-                      return Column(
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final barWidth = constraints.maxWidth;
-                              final thumbX = (barWidth * fraction - 7)
-                                  .clamp(0.0, barWidth - 14);
-                              return GestureDetector(
-                                key: _progressKey,
-                                onHorizontalDragStart: (details) {
-                                  _seekFromPosition(
-                                      details.globalPosition, barWidth, totalMs);
-                                },
-                                onHorizontalDragUpdate: (details) {
-                                  _seekFromPosition(
-                                      details.globalPosition, barWidth, totalMs);
-                                },
-                                onTapDown: (details) {
-                                  _seekFromPosition(
-                                      details.globalPosition, barWidth, totalMs);
-                                },
-                                child: SizedBox(
-                                  height: 24,
-                                  child: Stack(
-                                    alignment: Alignment.centerLeft,
-                                    children: [
-                                      // Track background
-                                      Positioned(
-                                        top: 9,
-                                        left: 0,
-                                        right: 0,
-                                        child: Container(
-                                          height: 6,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.shadowDark
-                                                .withValues(alpha: 0.4),
-                                            borderRadius:
-                                                BorderRadius.circular(3),
-                                          ),
-                                        ),
-                                      ),
-                                      // Filled track
-                                      Positioned(
-                                        top: 9,
-                                        left: 0,
-                                        child: Container(
-                                          height: 6,
-                                          width: thumbX,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.accent,
-                                            borderRadius:
-                                                BorderRadius.circular(3),
-                                          ),
-                                        ),
-                                      ),
-                                      // Draggable thumb
-                                      Positioned(
-                                        left: thumbX,
-                                        child: Container(
-                                          width: 14,
-                                          height: 14,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.accent,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: AppColors.accent
-                                                    .withValues(alpha: 0.4),
-                                                blurRadius: 6,
-                                                spreadRadius: 1,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_formatDuration(position),
-                                  style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12)),
-                              Text(_formatDuration(duration),
-                                  style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12)),
-                            ],
+                          const Icon(Icons.brightness_1,
+                              size: 8, color: AppColors.gold),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              lesson.scholarName,
+                              textAlign: TextAlign.center,
+                              style: AppType.bodySecondary,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
 
-              const SizedBox(height: 28),
+                      SizedBox(height: compact ? 18 : 26),
 
-              // Transport controls
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  StreamBuilder<bool>(
-                    stream: _player.shuffleModeEnabledStream,
-                    builder: (context, snapshot) {
-                      final shuffleOn = snapshot.data ?? false;
-                      return NeumorphicCircleButton(
-                        icon: Icons.shuffle,
-                        size: 48,
-                        iconSize: 22,
-                        iconColor: shuffleOn
-                            ? AppColors.accent
-                            : AppColors.textSecondary,
-                        onTap: () =>
-                            _player.setShuffleModeEnabled(!shuffleOn),
-                      );
-                    },
-                  ),
-                  NeumorphicCircleButton(
-                    icon: Icons.skip_previous_rounded,
-                    size: 64,
-                    iconSize: 28,
-                    onTap: _playPrevious,
-                  ),
-                  StreamBuilder<PlayerState>(
-                    stream: _player.playerStateStream,
-                    builder: (context, snapshot) {
-                      final playing =
-                          snapshot.data?.playing ?? false;
-                      return NeumorphicCircleButton(
-                        icon: playing
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        size: 84,
-                        iconSize: 40,
-                        onTap: () =>
-                            playing ? _player.pause() : _player.play(),
-                      );
-                    },
-                  ),
-                  NeumorphicCircleButton(
-                    icon: Icons.skip_next_rounded,
-                    size: 64,
-                    iconSize: 28,
-                    onTap: _currentIndex < _courseLessons.length - 1
-                        ? _playNext
-                        : null,
-                  ),
-                  StreamBuilder<LoopMode>(
-                    stream: _player.loopModeStream,
-                    builder: (context, snapshot) {
-                      final loopMode =
-                          snapshot.data ?? LoopMode.off;
-                      IconData icon;
-                      Color? color;
-                      switch (loopMode) {
-                        case LoopMode.off:
-                          icon = Icons.repeat;
-                          color = AppColors.textSecondary;
-                          break;
-                        case LoopMode.one:
-                          icon = Icons.repeat_one;
-                          color = AppColors.accent;
-                          break;
-                        case LoopMode.all:
-                          icon = Icons.repeat;
-                          color = AppColors.accent;
-                          break;
-                      }
-                      return NeumorphicCircleButton(
-                        icon: icon,
-                        size: 48,
-                        iconSize: 22,
-                        iconColor: color,
-                        onTap: () {
-                          final modes = [
-                            LoopMode.off,
-                            LoopMode.all,
-                            LoopMode.one,
-                          ];
-                          final nextIndex =
-                              (modes.indexOf(loopMode) + 1) %
-                                  modes.length;
-                          _player
-                              .setLoopMode(modes[nextIndex]);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
+                      // Progress
+                      _ProgressArea(
+                        lesson: lesson,
+                        onSeekRatio: (ratio) => _seek(ratio),
+                      ),
 
-              const SizedBox(height: 16),
+                      SizedBox(height: compact ? 10 : 20),
 
-              Text(
-                '${_currentIndex + 1} / ${_courseLessons.length}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
+                      // Transport controls
+                      _TransportControls(
+                        player: _player,
+                        onShuffle: (v) =>
+                            _player.setShuffleModeEnabled(v),
+                        onPrevious: _playPrevious,
+                        onPlayPause: () => _audio.togglePlay(),
+                        onNext: _currentIndex < _courseLessons.length - 1
+                            ? _playNext
+                            : null,
+                        onLoop: (mode) => _player.setLoopMode(mode),
+                        currentIndex: _currentIndex,
+                        totalCount: _courseLessons.length,
+                      ),
+
+                      const SizedBox(height: 12),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
     );
-          },
+  }
+
+  void _seek(double ratio) {
+    final lesson = _courseLessons[_currentIndex];
+    final duration = _player.duration ?? lesson.duration;
+    if (duration <= Duration.zero) return;
+    final target =
+        Duration(milliseconds: (duration.inMilliseconds * ratio).round());
+    _player.seek(target);
+  }
+}
+
+/// Circular disc artwork with a subtle rotation while playing.
+class _ArtworkDisc extends StatelessWidget {
+  final double size;
+  final Lesson lesson;
+  final bool playing;
+
+  const _ArtworkDisc({
+    required this.size,
+    required this.lesson,
+    required this.playing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppColors.goldRing,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gold.withValues(alpha: 0.25),
+            blurRadius: 36,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: AppColors.surfaceGradient,
+        ),
+        padding: const EdgeInsets.all(2),
+        child: ClipOval(
+          child: lesson.scholarPhotoPath != null
+              ? Image.asset(
+                  lesson.scholarPhotoPath!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _DiscFallback(
+                      size: size, lesson: lesson, playing: playing),
+                )
+              : _DiscFallback(
+                  size: size, lesson: lesson, playing: playing),
         ),
       ),
+    );
+  }
+}
+
+class _DiscFallback extends StatelessWidget {
+  final double size;
+  final Lesson lesson;
+  final bool playing;
+  const _DiscFallback(
+      {required this.size, required this.lesson, required this.playing});
+
+  @override
+  Widget build(BuildContext context) {
+    if (lesson.arabicLabel != null) {
+      return Container(
+        color: AppColors.primary,
+        alignment: Alignment.center,
+        child: Text(
+          lesson.arabicLabel!,
+          style: TextStyle(
+            fontSize: size * 0.22,
+            fontWeight: FontWeight.bold,
+            color: AppColors.gold,
+          ),
+        ),
+      );
+    }
+    return Container(
+      color: AppColors.primary,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.mic, color: AppColors.gold, size: 56),
+          if (playing) ...[
+            const SizedBox(height: 14),
+            const PlayingIndicator(size: 26),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressArea extends StatelessWidget {
+  final Lesson lesson;
+  final ValueChanged<double> onSeekRatio;
+  const _ProgressArea({required this.lesson, required this.onSeekRatio});
+
+  @override
+  Widget build(BuildContext context) {
+    final player = PlayerService.instance.player;
+    return StreamBuilder<Duration?>(
+      stream: player.durationStream,
+      builder: (context, durSnapshot) {
+        final duration = durSnapshot.data ?? lesson.duration;
+        return StreamBuilder<Duration>(
+          stream: player.positionStream,
+          builder: (context, posSnapshot) {
+            final position = posSnapshot.data ?? Duration.zero;
+            final totalMs =
+                duration.inMilliseconds.clamp(1, double.infinity).toInt();
+            final fraction =
+                (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
+            return Column(
+              children: [
+                AudioProgressBar(
+                  fraction: fraction,
+                  onSeek: onSeekRatio,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(formatDuration(position),
+                        style: AppType.smallMuted),
+                    Text(formatDuration(duration),
+                        style: AppType.smallMuted),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _TransportControls extends StatelessWidget {
+  final AudioPlayer player;
+  final ValueChanged<bool> onShuffle;
+  final VoidCallback onPrevious;
+  final VoidCallback onPlayPause;
+  final VoidCallback? onNext;
+  final ValueChanged<LoopMode> onLoop;
+  final int currentIndex;
+  final int totalCount;
+
+  const _TransportControls({
+    required this.player,
+    required this.onShuffle,
+    required this.onPrevious,
+    required this.onPlayPause,
+    required this.onNext,
+    required this.onLoop,
+    required this.currentIndex,
+    required this.totalCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            StreamBuilder<bool>(
+              stream: player.shuffleModeEnabledStream,
+              builder: (context, snapshot) {
+                final shuffleOn = snapshot.data ?? false;
+                return GoldIconButton(
+                  icon: Icons.shuffle,
+                  size: 46,
+                  iconSize: 20,
+                  iconColor: shuffleOn
+                      ? AppColors.goldLight
+                      : AppColors.textSecondary,
+                  onTap: () => onShuffle(!shuffleOn),
+                );
+              },
+            ),
+            GoldIconButton(
+              icon: Icons.skip_previous_rounded,
+              size: 56,
+              iconSize: 26,
+              onTap: onPrevious,
+            ),
+            // Main play/pause
+            StreamBuilder<PlayerState>(
+              stream: player.playerStateStream,
+              builder: (context, snapshot) {
+                final isPlaying = snapshot.data?.playing ?? false;
+                return GestureDetector(
+                  onTap: onPlayPause,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.goldGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: AppColors.primary,
+                      size: 40,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoldIconButton(
+              icon: Icons.skip_next_rounded,
+              size: 56,
+              iconSize: 26,
+              onTap: onNext,
+            ),
+            StreamBuilder<LoopMode>(
+              stream: player.loopModeStream,
+              builder: (context, snapshot) {
+                final loopMode = snapshot.data ?? LoopMode.off;
+                IconData icon;
+                Color? color;
+                switch (loopMode) {
+                  case LoopMode.off:
+                    icon = Icons.repeat;
+                    color = AppColors.textSecondary;
+                    break;
+                  case LoopMode.one:
+                    icon = Icons.repeat_one;
+                    color = AppColors.goldLight;
+                    break;
+                  case LoopMode.all:
+                    icon = Icons.repeat;
+                    color = AppColors.goldLight;
+                    break;
+                }
+                return GoldIconButton(
+                  icon: icon,
+                  size: 46,
+                  iconSize: 20,
+                  iconColor: color,
+                  onTap: () {
+                    final modes = [
+                      LoopMode.off,
+                      LoopMode.all,
+                      LoopMode.one,
+                    ];
+                    final nextIndex =
+                        (modes.indexOf(loopMode) + 1) % modes.length;
+                    onLoop(modes[nextIndex]);
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '${currentIndex + 1} / $totalCount',
+          style: AppType.smallMuted,
+        ),
+      ],
     );
   }
 }

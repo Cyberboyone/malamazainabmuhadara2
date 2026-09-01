@@ -28,9 +28,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/images/scholar_zainab.png"
-  adaptive_icon_background: "#2E5A46"
-  adaptive_icon_foreground: "assets/images/icon_foreground.png"
+  image_path: "assets/images/muhadara2_icon.png"
+  adaptive_icon_background: "#081E33"
+  adaptive_icon_foreground: "assets/images/muhadara2_icon.png"
 
 flutter:
   uses-material-design: true

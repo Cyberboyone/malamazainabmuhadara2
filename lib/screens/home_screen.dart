@@ -1,14 +1,16 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../data/sample_lessons.dart';
 import '../models/lesson.dart';
+import '../screens/player_screen.dart';
 import '../services/duration_service.dart';
-import '../theme/neumorphic.dart';
+import '../services/player_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
+import '../widgets/banner_ad_box.dart';
+import '../widgets/gold_icon_button.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/mini_player.dart';
-import 'player_screen.dart';
+import '../widgets/section_header.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,11 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     DurationService.instance.durationsReady.addListener(_rebuild);
+    PlayerService.instance.tick.addListener(_rebuild);
   }
 
   @override
   void dispose() {
     DurationService.instance.durationsReady.removeListener(_rebuild);
+    PlayerService.instance.tick.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -39,8 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> get _courses {
     final courses =
         sampleLessons.map((l) => l.course).toSet().toList();
-    courses.insert(0, 'All');
-    return courses;
+    courses.sort();
+    return ['All', ...courses];
   }
 
   List<Lesson> get _lessons {
@@ -50,195 +54,241 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
   }
 
-  String _chipLabel(String course) => course;
+  void _openPlayer(Lesson lesson) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PlayerScreen(lesson: lesson)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final totalDuration = sampleLessons.fold<Duration>(
+      Duration.zero,
+      (sum, l) => sum + l.duration,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Malama Zainab Jaafar',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${sampleLessons.length} lessons - offline audio',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+      body: PremiumBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    AppHeader(
+                      tagline: 'MALAMA ZAINAB JAAFAR',
+                      title: 'Muhadara 2',
+                      subtitle:
+                          '${sampleLessons.length} lessons - offline audio lectures',
+                      artworkPath: 'assets/images/scholar_zainab.png',
                     ),
-                  ),
-                  ClipOval(
-                    child: Image.asset(
-                      'assets/images/scholar_zainab.png',
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const NeumorphicCircleButton(
-                          icon: Icons.person_outline,
-                          size: 48,
-                          iconSize: 22,
-                        );
-                      },
+                    const SizedBox(height: 16),
+                    _HeroCard(
+                      totalLessons: sampleLessons.length,
+                      totalDuration: totalDuration,
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 20),
 
-            const SizedBox(height: 12),
-
-            // Course filter chips
-            SizedBox(
-              height: 44,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _courses.length,
-                itemBuilder: (context, index) {
-                  final course = _courses[index];
-                  final selected = _selectedCourse == course;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _selectedCourse = course),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: selected
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.shadowDark
-                                        .withValues(alpha: 0.5),
-                                    offset: const Offset(3, 3),
-                                    blurRadius: 8,
-                                  ),
-                                  const BoxShadow(
-                                    color: AppColors.shadowLight,
-                                    offset: Offset(-3, -3),
-                                    blurRadius: 8,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Text(
-                          _chipLabel(course),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: selected
-                                ? AppColors.accent
-                                : AppColors.textSecondary,
-                          ),
+                    // Filter chips
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        height: 36,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _courses.length,
+                          itemBuilder: (context, index) {
+                            final course = _courses[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: GoldFilterChip(
+                                label: course,
+                                selected: _selectedCourse == course,
+                                onTap: () => setState(
+                                    () => _selectedCourse = course),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
 
-            const SizedBox(height: 12),
-
-            // Lessons count
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Text(
-                    '${_lessons.length} Lessons',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SectionHeader(
+                        title: _selectedCourse == 'All'
+                            ? 'All Lessons'
+                            : _selectedCourse,
+                        trailing: '${_lessons.length}',
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 10),
 
-            const SizedBox(height: 8),
-
-            // Lessons list with banner ads every 4 lessons
-            Expanded(
-              child: _lessons.isEmpty
-                  ? const Center(
-                      child: Text('No lessons available.',
-                          style:
-                              TextStyle(color: AppColors.textSecondary)),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(top: 8, bottom: 24),
-                      itemCount: _lessons.length,
-                      itemBuilder: (context, index) {
-                        final lesson = _lessons[index];
+                    // Lessons list with ads
+                    if (_lessons.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Text(
+                            'No lessons in this category yet.',
+                            style: AppType.bodySecondary,
+                          ),
+                        ),
+                      )
+                    else
+                      ..._lessons.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final lesson = entry.value;
                         final showBanner =
-                            (index + 1) % 4 == 0 && index < _lessons.length - 1;
+                            (index + 1) % 4 == 0 &&
+                                index < _lessons.length - 1;
                         return Column(
                           children: [
                             LessonCard(
                               lesson: lesson,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          PlayerScreen(lesson: lesson)),
-                                );
-                              },
+                              lessonNumber: index + 1,
+                              onTap: () => _openPlayer(lesson),
                             ),
-                            if (showBanner && !kIsWeb && Platform.isAndroid)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                child: SizedBox(
-                                  height: 60,
-                                  child: AndroidView(
-                                    viewType: 'zainab2_banner_ad',
-                                    creationParams: {'index': index},
-                                    creationParamsCodec:
-                                        const StandardMessageCodec(),
-                                  ),
-                                ),
+                            if (showBanner)
+                              BannerAdBox(
+                                index: index,
                               ),
                           ],
                         );
-                      },
-                    ),
-            ),
+                      }),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
 
-            // Mini player
-            const MiniPlayer(),
-          ],
+              // Persistent mini player
+              const MiniPlayer(),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  final int totalLessons;
+  final Duration totalDuration;
+
+  const _HeroCard({
+    required this.totalLessons,
+    required this.totalDuration,
+  });
+
+  String get _durationLabel {
+    final h = totalDuration.inHours;
+    final m = totalDuration.inMinutes.remainder(60);
+    if (h > 0) return '$h hr ${m.toString().padLeft(2, '0')} min';
+    return '${totalDuration.inMinutes} min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: AppColors.surfaceGradient,
+        borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.5),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Artwork
+          Container(
+            width: 92,
+            height: 92,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppColors.goldRing,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(shape: BoxShape.circle),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/scholar_zainab.png',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: AppColors.surface,
+                  child: const Icon(Icons.mic,
+                      color: AppColors.gold, size: 36),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'The Lectures Collection',
+                  style: AppType.brandTagline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Muhadara 2',
+                  style: AppType.screenTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _Stat(value: '$totalLessons', label: 'Lectures'),
+                    const SizedBox(width: 16),
+                    _Stat(value: _durationLabel, label: 'Playback'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _Stat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: AppColors.goldLight,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: AppType.smallMuted,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }

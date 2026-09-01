@@ -7,7 +7,7 @@ import 'services/ads_service.dart';
 import 'services/duration_service.dart';
 import 'services/player_service.dart';
 import 'services/progress_service.dart';
-import 'theme/neumorphic.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,13 +60,7 @@ class IslamicAudioApp extends StatelessWidget {
         DefaultMaterialLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: AppColors.accent,
-        scaffoldBackgroundColor: AppColors.background,
-        brightness: Brightness.light,
-        fontFamily: 'Roboto',
-      ),
+      theme: buildAppTheme(),
       home: const HomeScreen(),
     );
   }
