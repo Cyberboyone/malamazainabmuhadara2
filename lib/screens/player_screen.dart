@@ -140,12 +140,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ),
                             ],
                           ),
-                          GoldIconButton(
-                            icon: Icons.more_horiz,
-                            size: 44,
-                            iconSize: 22,
-                            onTap: () {},
-                          ),
+                          const SizedBox(width: 44),
                         ],
                       ),
 

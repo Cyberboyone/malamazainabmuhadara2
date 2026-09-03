@@ -1,7 +1,7 @@
 name: malama_zainab_muhadara2
 description: Offline audio Muhadara app for Malama Zainab Jaafar.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
